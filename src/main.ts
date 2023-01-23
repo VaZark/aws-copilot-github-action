@@ -1,10 +1,10 @@
 import * as core from '@actions/core'
 import * as os from 'os'
 
-import { cacheFile, downloadTool, find } from '@actions/tool-cache'
-import { chmodSync } from 'fs'
-import { exec } from '@actions/exec'
-import { HttpClient } from '@actions/http-client'
+import {cacheFile, downloadTool, find} from '@actions/tool-cache'
+import {chmodSync} from 'fs'
+import {exec, getExecOutput} from '@actions/exec'
+import {HttpClient} from '@actions/http-client'
 
 const COPILOT_CLI_TOOL_NAME = 'aws-copilot-cli'
 
@@ -30,7 +30,7 @@ async function processCommand(command: string): Promise<void> {
   } else if (command === 'deploy') {
     await deployApp()
   } else if (command === 'get-service-id') {
-    await extractResources();
+    await extractResources()
   }
 }
 
@@ -71,7 +71,7 @@ async function getLatestVersion(): Promise<string> {
   const response = await http.getJson(
     'https://api.github.com/repos/aws/copilot-cli/releases/latest'
   )
-  const latestVersion = (response.result as { tag_name: string }).tag_name
+  const latestVersion = (response.result as {tag_name: string}).tag_name
   return latestVersion
 }
 
@@ -87,15 +87,23 @@ async function packApp(): Promise<void> {
     await install()
   }
 
-  const app = core.getInput('app');
+  const app = core.getInput('app')
   const path = core.getInput('path') || '.'
 
   if (!app) {
     throw new Error('App name is required')
   }
 
-  const services = await exec('copilot', ['svc', 'ls', '--app', app, '--local', '--json'], { cwd: path });
-  const jobs = await exec('copilot', ['job', 'ls', '--app', app, '--local', '--json'], { cwd: path });
+  const services = await exec(
+    'copilot',
+    ['svc', 'ls', '--app', app, '--local', '--json'],
+    {cwd: path}
+  )
+  const jobs = await exec(
+    'copilot',
+    ['job', 'ls', '--app', app, '--local', '--json'],
+    {cwd: path}
+  )
 
   core.debug(`Services ${services}`)
   core.debug(`Jobs ${jobs}`)
@@ -113,7 +121,7 @@ async function deployApp(): Promise<void> {
   const env = core.getInput('env')
   const path = core.getInput('path') || '.'
 
-  const force = false;
+  const force = false
 
   if (!app) {
     throw new Error('App name is required')
@@ -123,23 +131,20 @@ async function deployApp(): Promise<void> {
     throw new Error('Environment is required')
   }
 
-  const deploy = await exec('copilot', [
-    'deploy',
-    '--app',
-    app,
-    '--env',
-    env,
-    force ? '--force' : ''
-  ], { cwd: path });
+  const deploy = await exec(
+    'copilot',
+    ['deploy', '--app', app, '--env', env, force ? '--force' : ''],
+    {cwd: path}
+  )
 
   core.debug(
-    `Deploying app ${app} to env ${env} ${force ? 'with force' : ''
+    `Deploying app ${app} to env ${env} ${
+      force ? 'with force' : ''
     } is done ${deploy}`
   )
 
   core.info('Copilot application deployed successfully')
 }
-
 
 async function extractResources(): Promise<void> {
   const isInstalled = await checkToolIsInstalled(COPILOT_CLI_TOOL_NAME)
@@ -164,16 +169,13 @@ async function extractResources(): Promise<void> {
     throw new Error('Environment is required')
   }
 
-  const svc = await exec('copilot', [
-    'svc',
-    'show',
-    '--resources',
-    '--app',
-    app,
-    '--name',
-    svcName,
-    '--json'
-  ], { cwd: path });
+  const {exitCode, stdout, stderr} = await getExecOutput(
+    'copilot',
+    ['svc', 'show', '--resources', '--app', app, '--name', svcName, '--json'],
+    {cwd: path}
+  )
+
+  const svc = JSON.parse(stdout)
 
   core.info(`Extracted resources info`)
 
@@ -182,13 +184,13 @@ async function extractResources(): Promise<void> {
   }
 
   for (let resource of svc.resources[env]) {
-    if (resource.type != "AWS::ECS::Service") {
-      continue;
+    if (resource.type != 'AWS::ECS::Service') {
+      continue
     }
 
-    let split_physical_id = resource.physicalID.split("/")
-    core.setOutput("CLUSTER_ID", split_physical_id[1]);
-    core.setOutput("SERVICE_ID", split_physical_id[2]);
-    break;
+    let split_physical_id = resource.physicalID.split('/')
+    core.setOutput('CLUSTER_ID', split_physical_id[1])
+    core.setOutput('SERVICE_ID', split_physical_id[2])
+    break
   }
 }
