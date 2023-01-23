@@ -29,6 +29,8 @@ async function processCommand(command: string): Promise<void> {
     await packApp()
   } else if (command === 'deploy') {
     await deployApp()
+  } else if (command === 'get-service-id') {
+    await extractResources();
   }
 }
 
@@ -136,4 +138,57 @@ async function deployApp(): Promise<void> {
   )
 
   core.info('Copilot application deployed successfully')
+}
+
+
+async function extractResources(): Promise<void> {
+  const isInstalled = await checkToolIsInstalled(COPILOT_CLI_TOOL_NAME)
+  if (!isInstalled) {
+    await install()
+  }
+
+  const app = core.getInput('app')
+  const svcName = core.getInput('service')
+  const env = core.getInput('env')
+  const path = core.getInput('path') || '.'
+
+  if (!app) {
+    throw new Error('App name is required')
+  }
+
+  if (!svcName) {
+    throw new Error('Service name is required')
+  }
+
+  if (!env) {
+    throw new Error('Environment is required')
+  }
+
+  const svc = await exec('copilot', [
+    'svc',
+    'show',
+    '--resources',
+    '--app',
+    app,
+    '--name',
+    svcName,
+    '--json'
+  ], { cwd: path });
+
+  core.info(`Extracted resources info`)
+
+  if (!svc.resources.hasOwnProperty(env)) {
+    throw new Error('Invalid env provided')
+  }
+
+  for (let resource of svc.resources[env]) {
+    if (resource.type != "AWS::ECS::Service") {
+      continue;
+    }
+
+    let split_physical_id = resource.physicalID.split("/")
+    core.setOutput("CLUSTER_ID", split_physical_id[1]);
+    core.setOutput("SERVICE_ID", split_physical_id[2]);
+    break;
+  }
 }
