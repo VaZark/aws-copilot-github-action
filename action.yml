@@ -6,6 +6,9 @@ inputs:
     required: true
     description: "command"
     default: "install"
+  service:
+    required: false
+    description: "service name"
   app:
     required: false
     description: "application name"
